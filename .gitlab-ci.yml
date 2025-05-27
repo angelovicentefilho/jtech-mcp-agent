@@ -1,0 +1,57 @@
+image: python:3.10
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+  POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.poetry-cache"
+
+cache:
+  paths:
+    - .pip-cache/
+    - .poetry-cache/
+    - .venv/
+
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+before_script:
+  - python -m pip install --upgrade pip
+  - pip install poetry
+  - poetry config virtualenvs.in-project true
+  - poetry install
+
+lint:
+  stage: lint
+  script:
+    - poetry run ruff check .
+
+test:
+  stage: test
+  script:
+    - poetry run pytest
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+
+build:
+  stage: build
+  script:
+    - poetry build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+  only:
+    - tags
+    - main
+
+deploy:
+  stage: deploy
+  script:
+    - poetry config repositories.jtech "${JTECH_REPOSITORY_URL}"
+    - poetry config http-basic.jtech "${JTECH_REPO_USER}" "${JTECH_REPO_PASSWORD}"
+    - poetry publish --repository jtech
+  only:
+    - tags
+  dependencies:
+    - build
