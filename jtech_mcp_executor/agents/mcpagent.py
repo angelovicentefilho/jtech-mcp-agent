@@ -7,6 +7,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 
 import logging
 from collections.abc import AsyncIterator
+from typing import Any, Optional # Added Optional
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.globals import set_debug
@@ -53,6 +54,8 @@ class JtechMCPAgent:
         disallowed_tools: list[str] | None = None,
         use_server_manager: bool = False,
         verbose: bool = False,
+        role: Optional[str] = None,
+        role_description: Optional[str] = None,
     ):
         """Initialize a new Jtech MCP Agent instance.
 
@@ -68,6 +71,8 @@ class JtechMCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            role: The specific role of the agent (e.g., 'Pesquisador').
+            role_description: A description of the agent's role.
         """
         self.llm = llm
         self.client = client
@@ -85,6 +90,8 @@ class JtechMCPAgent:
         # User can provide a template override, otherwise use the imported default
         self.system_prompt_template_override = system_prompt_template
         self.additional_instructions = additional_instructions
+        self.role = role
+        self.role_description = role_description
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -312,6 +319,7 @@ class JtechMCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[StreamEvent]:
         """Internal async generator yielding response chunks.
 
@@ -350,6 +358,8 @@ class JtechMCPAgent:
             m for m in history_to_use if isinstance(m, HumanMessage | AIMessage)
         ]
         inputs = {"input": query, "chat_history": langchain_history}
+        if context:
+            inputs.update(context) # Add context to inputs
 
         # 3. Stream & diff -------------------------------------------------------
         accumulated = ""
@@ -370,6 +380,7 @@ class JtechMCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
         """Asynchronous streaming interface.
 
@@ -383,6 +394,7 @@ class JtechMCPAgent:
             max_steps=max_steps,
             manage_connector=manage_connector,
             external_history=external_history,
+            context=context,
         ):
             yield chunk
 
@@ -392,6 +404,7 @@ class JtechMCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Run a query using the MCP tools with unified step-by-step execution.
 
@@ -407,12 +420,16 @@ class JtechMCPAgent:
                 for managing the connector lifecycle.
             external_history: Optional external history to use instead of the
                 internal conversation history.
+            context: Optional dictionary for providing additional context to the agent.
 
         Returns:
             The result of running the query.
         """
         result = ""
         initialized_here = False
+
+        if context:
+            logger.info(f"Executando agente '{self.role or self.__class__.__name__}' com o seguinte contexto: {context}")
 
         try:
             # Initialize if needed
@@ -458,6 +475,8 @@ class JtechMCPAgent:
 
             intermediate_steps: list[tuple[AgentAction, str]] = []
             inputs = {"input": query, "chat_history": langchain_history}
+            if context:
+                inputs.update(context) # Add context to inputs
 
             # Construct a mapping of tool name to tool for easy lookup
             name_to_tool_map = {tool.name: tool for tool in self._tools}
@@ -608,3 +627,44 @@ class JtechMCPAgent:
             self._tools = []
             self._sessions = {}
             self._initialized = False
+
+    def set_role(self, role: str, description: str) -> None:
+        """Define o papel específico do agente.
+
+        Args:
+            role: O nome do papel (ex: 'Pesquisador', 'Analista').
+            description: Uma breve descrição das responsabilidades do papel.
+        """
+        self.role = role
+        self.role_description = description
+        logger.info(f"Agente '{self.__class__.__name__}' agora tem o papel '{role}': {description}")
+
+    def get_role(self) -> tuple[Optional[str], Optional[str]]:
+        """Retorna o papel atual e sua descrição.
+
+        Returns:
+            Uma tupla contendo (role, role_description).
+        """
+        return self.role, self.role_description
+
+    async def receive_message(
+        self,
+        message: str,
+        from_agent: str, # Nome ou ID do agente remetente
+        context: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Recebe uma mensagem de outro agente.
+
+        Esta é uma implementação básica para log. Pode ser expandida para
+        processar a mensagem, armazená-la, ou influenciar o comportamento do agente.
+
+        Args:
+            message: O conteúdo da mensagem.
+            from_agent: O nome ou ID do agente que enviou a mensagem.
+            context: Dados contextuais adicionais enviados com a mensagem.
+        """
+        logger.info(f"Agente '{self.role or self.__class__.__name__}' recebeu mensagem de '{from_agent}': '{message}'")
+        if context:
+            logger.info(f"Contexto da mensagem recebida: {context}")
+        # Implementação futura pode adicionar a mensagem a um inbox interno,
+        # atualizar o estado do agente, ou disparar ações.

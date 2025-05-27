@@ -24,6 +24,16 @@ from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketC
 from .logging import MCP_USE_DEBUG, Logger, logger
 from .session import JtechMCPSession
 
+from .orchestration import (
+    JtechMCPCrew,
+    JtechMCPTask,
+    SequentialWorkflow,
+    ParallelWorkflow,
+    HierarchicalWorkflow,
+    AgentMemory,
+    ResultAggregator
+)
+
 __version__ = version("jtech-mcp-executor")
 
 __all__ = [
@@ -34,6 +44,17 @@ __all__ = [
     "StdioConnector",
     "WebSocketConnector",
     "HttpConnector",
+    
+    # Novos componentes de orquestração
+    "JtechMCPCrew",
+    "JtechMCPTask",
+    "SequentialWorkflow",
+    "ParallelWorkflow",
+    "HierarchicalWorkflow",
+    "AgentMemory",
+    "ResultAggregator",
+
+    # Funções/variáveis existentes (mantendo create_session_from_config conforme instruído)
     "create_session_from_config",
     "load_config_file",
     "logger",
