@@ -4,6 +4,7 @@ WebSocket connection management for MCP implementations.
 This module provides a connection manager for WebSocket-based MCP connections.
 """
 
+import asyncio
 from typing import Any
 
 from mcp.client.websocket import websocket_client
@@ -56,7 +57,12 @@ class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):
             # Exit the context manager
             try:
                 logger.debug("Closing WebSocket connection")
-                await self._ws_ctx.__aexit__(None, None, None)
+                # Set a timeout for the exit operation
+                try:
+                    # Try with timeout to avoid hanging
+                    await asyncio.wait_for(self._ws_ctx.__aexit__(None, None, None), timeout=5.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout reached while closing WebSocket connection")
             except Exception as e:
                 logger.warning(f"Error closing WebSocket connection: {e}")
             finally:

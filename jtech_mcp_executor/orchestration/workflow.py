@@ -38,11 +38,11 @@ class JtechMCPWorkflow(ABC):
         self,
         crew: 'JtechMCPCrew', # Usar string para JtechMCPCrew para evitar import circular
         task_description: str, # Descrição da tarefa geral para o workflow
-        context: Optional[Dict[str, Any]] = None,
+        shared_memory: AgentMemory,
         # A memória compartilhada pode ser passada aqui explicitamente pelo Crew,
         # ou o workflow pode usar a que foi definida no seu construtor ou via setter.
         # Para consistência, vamos esperar que o Crew a passe no execute.
-        shared_memory: AgentMemory 
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Executa o workflow com o crew e a tarefa especificados.
 
@@ -112,8 +112,8 @@ class SequentialWorkflow(JtechMCPWorkflow):
         self,
         crew: 'JtechMCPCrew',
         task_description: str, # Descrição da tarefa geral para o workflow
-        context: Optional[Dict[str, Any]] = None,
-        shared_memory: AgentMemory # Memória compartilhada vinda do Crew
+        shared_memory: AgentMemory, # Memória compartilhada vinda do Crew
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Executa as tarefas sequencialmente.
 
@@ -339,8 +339,8 @@ class ParallelWorkflow(JtechMCPWorkflow):
         self,
         crew: 'JtechMCPCrew',
         task_description: str, 
-        context: Optional[Dict[str, Any]] = None,
-        shared_memory: AgentMemory 
+        shared_memory: AgentMemory,
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Executa as tarefas em paralelo usando asyncio.gather e agrega os resultados."""
         if crew.verbose:
@@ -471,8 +471,8 @@ class HierarchicalWorkflow(JtechMCPWorkflow):
         self,
         crew: 'JtechMCPCrew',
         task_description: str, 
-        context: Optional[Dict[str, Any]] = None,
-        shared_memory: AgentMemory
+        shared_memory: AgentMemory,
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Executa o workflow hierárquico."""
         if crew.verbose:

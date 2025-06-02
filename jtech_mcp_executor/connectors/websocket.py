@@ -132,7 +132,10 @@ class WebSocketConnector(BaseConnector):
                 logger.debug("Cancelling WebSocket receiver task")
                 self._receiver_task.cancel()
                 try:
-                    await self._receiver_task
+                    # Set a timeout for waiting on the cancelled task
+                    await asyncio.wait_for(asyncio.shield(self._receiver_task), timeout=2.0)
+                except asyncio.TimeoutError:
+                    logger.debug("Timeout waiting for WebSocket receiver task to cancel")
                 except asyncio.CancelledError:
                     logger.debug("WebSocket receiver task cancelled successfully")
                 except Exception as e:
@@ -156,7 +159,11 @@ class WebSocketConnector(BaseConnector):
         if self._connection_manager:
             try:
                 logger.debug("Stopping connection manager")
-                await self._connection_manager.stop()
+                try:
+                    # Set a timeout for stopping the connection manager
+                    await asyncio.wait_for(self._connection_manager.stop(), timeout=3.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout reached while stopping connection manager")
             except Exception as e:
                 error_msg = f"Error stopping connection manager: {e}"
                 logger.warning(error_msg)
@@ -170,6 +177,8 @@ class WebSocketConnector(BaseConnector):
 
         if errors:
             logger.warning(f"Encountered {len(errors)} errors during resource cleanup")
+        else:
+            logger.debug("Resources cleaned up successfully")
 
     async def _send_request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Send a request and wait for a response."""

@@ -111,8 +111,8 @@ class JtechMCPCrew:
         result = await workflow.execute(
             crew=self,
             task_description=task_description,
-            context=current_context,
-            shared_memory=self.shared_memory # Passando a memória compartilhada
+            shared_memory=self.shared_memory, # Passando a memória compartilhada
+            context=current_context
         )
         
         if self.verbose:
@@ -125,17 +125,23 @@ class JtechMCPCrew:
         if self.verbose:
             logger.info(f"Fechando o crew '{self.name}' e seus agentes...")
         
-        closing_tasks = []
-        for agent in self.agents.values():
-            if hasattr(agent, 'close') and asyncio.iscoroutinefunction(agent.close):
-                closing_tasks.append(agent.close())
-            elif hasattr(agent, 'close'):
-                # Se 'close' não for uma corrotina, chamar diretamente (menos comum para I/O)
-                # ou logar um aviso. Para este contexto, vamos assumir que é async.
-                logger.warning(f"Agente {agent.role or agent.__class__.__name__} possui um método 'close' que não é uma corrotina. Não será aguardado.")
-
-        if closing_tasks:
-            await asyncio.gather(*closing_tasks)
+        errors = []
+        for agent_role, agent in self.agents.items():
+            if hasattr(agent, 'close'):
+                try:
+                    if asyncio.iscoroutinefunction(agent.close):
+                        await agent.close()
+                    else:
+                        # Se 'close' não for uma corrotina, chamar diretamente
+                        agent.close()
+                    if self.verbose:
+                        logger.info(f"Agente '{agent_role}' fechado com sucesso.")
+                except Exception as e:
+                    error_msg = f"Erro ao fechar o agente '{agent_role}': {e}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
         
-        if self.verbose:
+        if errors:
+            logger.warning(f"Crew '{self.name}' fechado com {len(errors)} erros.")
+        elif self.verbose:
             logger.info(f"Crew '{self.name}' fechado com sucesso.")
